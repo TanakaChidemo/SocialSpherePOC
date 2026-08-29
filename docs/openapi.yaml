@@ -1,0 +1,201 @@
+openapi: 3.0.3
+info:
+  title: Social Media Content Publishing System API
+  version: 0.1.0
+  description: >
+    Core backend API (Express) for authentication, content management,
+    AI generation proxying, and publishing to Facebook/Instagram.
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Local development
+
+tags:
+  - name: Auth
+  - name: Content
+  - name: AI
+  - name: Publish
+  - name: SocialAccounts
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                name: { type: string }
+      responses:
+        "201": { description: User created, tokens issued }
+        "409": { description: Email already registered }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email/password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200": { description: Tokens issued }
+        "401": { description: Invalid credentials }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Exchange a refresh token for a new access token
+      responses:
+        "200": { description: New access token }
+
+  /auth/oauth/meta:
+    get:
+      tags: [Auth]
+      summary: Begin Meta (Facebook/Instagram) OAuth linking flow
+      security: [{ bearerAuth: [] }]
+      responses:
+        "302": { description: Redirect to Meta's OAuth dialog }
+
+  /content:
+    get:
+      tags: [Content]
+      summary: List content drafts for the authenticated user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: List of drafts }
+    post:
+      tags: [Content]
+      summary: Create a new content draft
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body]
+              properties:
+                title: { type: string }
+                body: { type: string }
+                platforms:
+                  type: array
+                  items: { type: string, enum: [facebook, instagram] }
+      responses:
+        "201": { description: Draft created }
+
+  /content/{id}:
+    get:
+      tags: [Content]
+      summary: Get a draft by ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200": { description: Draft }
+        "404": { description: Not found }
+    put:
+      tags: [Content]
+      summary: Update a draft (creates a new version entry)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200": { description: Updated draft }
+    delete:
+      tags: [Content]
+      summary: Delete a draft
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "204": { description: Deleted }
+
+  /ai/generate-caption:
+    post:
+      tags: [AI]
+      summary: Generate an AI caption for a topic + platform
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [topic]
+              properties:
+                topic: { type: string }
+                platform: { type: string }
+                tone: { type: string }
+      responses:
+        "200": { description: Generated caption }
+
+  /ai/suggest-hashtags:
+    post:
+      tags: [AI]
+      summary: Suggest hashtags for a piece of content
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Hashtag list }
+
+  /ai/repurpose:
+    post:
+      tags: [AI]
+      summary: Repurpose content across target platforms
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Repurposed content per platform }
+
+  /publish/now:
+    post:
+      tags: [Publish]
+      summary: Publish a draft immediately
+      security: [{ bearerAuth: [] }]
+      responses:
+        "202": { description: Publish job accepted }
+
+  /publish/status/{scheduledPostId}:
+    get:
+      tags: [Publish]
+      summary: Check publish status
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: scheduledPostId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Status }
+
+  /social-accounts:
+    get:
+      tags: [SocialAccounts]
+      summary: List linked social accounts
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Linked accounts }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
